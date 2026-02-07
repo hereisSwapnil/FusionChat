@@ -11,6 +11,11 @@ An AI-powered chat application with advanced RAG (Retrieval-Augmented Generation
 - **Modern UI**: Clean, ChatGPT-inspired interface with smooth animations
 - **Docker Support**: One-command deployment with full containerization
 
+## Screenshots
+
+[![Clean-Shot-2026-02-07-at-20-59-51-2x.png](https://i.postimg.cc/5tMQq2nT/Clean-Shot-2026-02-07-at-20-59-51-2x.png)](https://postimg.cc/HrBLTdG9)
+[![Clean-Shot-2026-02-07-at-21-00-25-2x.png](https://i.postimg.cc/WbFdBkyC/Clean-Shot-2026-02-07-at-21-00-25-2x.png)](https://postimg.cc/9r2XTrCY)
+
 ## 🛠️ Tech Stack
 
 ### Backend
