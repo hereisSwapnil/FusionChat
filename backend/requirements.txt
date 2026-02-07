@@ -1,0 +1,10 @@
+openai
+pydantic-settings
+qdrant-client
+requests
+fastapi
+uvicorn
+python-multipart
+neo4j
+sqlalchemy[asyncio]
+asyncpg
