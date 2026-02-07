@@ -8,3 +8,5 @@ python-multipart
 neo4j
 sqlalchemy[asyncio]
 asyncpg
+nltk
+PyPDF2

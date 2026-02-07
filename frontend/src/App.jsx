@@ -14,6 +14,7 @@ function App() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(null); // { name: string, status: 'uploading' | 'success' | 'error' }
   const [editingId, setEditingId] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [polling, setPolling] = useState(false);
@@ -36,12 +37,22 @@ function App() {
     formData.append('file', file);
     formData.append('chat_id', chatId);
 
-    setUploading(true); // Use specific upload state
+    setUploading(true);
+    setUploadingFile({ name: file.name, status: 'uploading' });
+
     try {
       await axios.post(`${API_BASE}/ingest/file`, formData);
+      setUploadingFile({ name: file.name, status: 'success' });
       fetchMessages(chatId);
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setUploadingFile(null), 3000);
     } catch (err) {
       console.error("Failed to upload file", err);
+      setUploadingFile({ name: file.name, status: 'error' });
+
+      // Clear error message after 5 seconds
+      setTimeout(() => setUploadingFile(null), 5000);
     } finally {
       setUploading(false);
       e.target.value = '';
@@ -271,6 +282,44 @@ function App() {
         </header>
 
         <div className="messages-container">
+          {/* Upload Loader */}
+          {uploadingFile && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className={`upload-loader ${uploadingFile.status}`}
+            >
+              <div className="upload-loader-content">
+                {uploadingFile.status === 'uploading' && (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="upload-spinner"
+                  />
+                )}
+                {uploadingFile.status === 'success' && (
+                  <svg className="upload-icon success" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                {uploadingFile.status === 'error' && (
+                  <svg className="upload-icon error" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+                <div className="upload-info">
+                  <span className="upload-filename">{uploadingFile.name}</span>
+                  <span className="upload-status-text">
+                    {uploadingFile.status === 'uploading' && 'Processing document...'}
+                    {uploadingFile.status === 'success' && 'Successfully uploaded!'}
+                    {uploadingFile.status === 'error' && 'Upload failed'}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {documents.length > 0 && (
             <div className="documents-tray">
               {documents.map(doc => (

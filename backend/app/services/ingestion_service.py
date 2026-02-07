@@ -1,4 +1,3 @@
-from app.core.utils import chunk_text
 from app.services.vector_service import VectorService
 from app.schemas.chunk import Chunk
 from app.schemas.entity import Entity
@@ -41,27 +40,32 @@ class IngestionService:
                 db.add(doc)
                 await db.commit()
 
-        chunks = chunk_text(text)
-        # ... (rest of the logic remains synchronous for now as vector/graph services are likely sync)
-        # However, we should probably make them async if they aren't.
-        # For now, let's keep the existing logic but wrapped in this async method.
+        # Use semantic chunking with metadata
+        from app.core.utils import chunk_text_semantic
+
+        chunks_with_metadata = chunk_text_semantic(text)
 
         # Track all entities across chunks for this document
         global_entity_map = {}
 
-        for index, content in enumerate(chunks):
+        for chunk_data in chunks_with_metadata:
             chunk = Chunk(
                 chat_id=chat_id,
                 document_id=document_id,
-                content=content,
-                index=index,
+                content=chunk_data["content"],
+                index=chunk_data["metadata"]["chunk_index"],
+                char_start=chunk_data["metadata"]["char_start"],
+                char_end=chunk_data["metadata"]["char_end"],
+                position_ratio=chunk_data["metadata"]["position_ratio"],
+                content_type=chunk_data["metadata"]["content_type"],
+                headings=chunk_data["metadata"]["headings"],
             )
 
             # 1. Vector store
             self.vector.upsert_chunk(chunk)
 
             # 2. Graph extraction
-            extraction = self.graph.extract_entities_and_relationships(content)
+            extraction = self.graph.extract_entities_and_relationships(chunk.content)
 
             # 3. Store entities (with deduplication)
             for e in extraction.entities:
