@@ -87,6 +87,14 @@ async def ingest_file(
 
         return IngestionResponse(document_id=document_id, status="success")
     except ValueError as e:
+        import traceback
+
+        print(f"ValueError in ingest_file: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        import traceback
+
+        print(f"Exception in ingest_file: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))

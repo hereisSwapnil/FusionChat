@@ -14,7 +14,7 @@ function App() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadingFile, setUploadingFile] = useState(null); // { name: string, status: 'uploading' | 'success' | 'error' }
+  const [uploadingFile, setUploadingFile] = useState(null); // { name, status: 'uploading' | 'success' | 'error' }
   const [editingId, setEditingId] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [polling, setPolling] = useState(false);
@@ -33,26 +33,36 @@ function App() {
       chatId = newChat.id;
     }
 
+    setUploading(true);
+    setUploadingFile({ name: file.name, status: 'uploading' });
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('chat_id', chatId);
 
-    setUploading(true);
-    setUploadingFile({ name: file.name, status: 'uploading' });
+    const startTime = Date.now();
 
     try {
-      await axios.post(`${API_BASE}/ingest/file`, formData);
+      const response = await axios.post(`${API_BASE}/ingest/file`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      // Ensure loader shows for at least 800ms
+      const elapsed = Date.now() - startTime;
+      const minDisplayTime = 800;
+      if (elapsed < minDisplayTime) {
+        await new Promise(resolve => setTimeout(resolve, minDisplayTime - elapsed));
+      }
+
       setUploadingFile({ name: file.name, status: 'success' });
-      fetchMessages(chatId);
+      setTimeout(() => setUploadingFile(null), 2000); // Hide after 2 seconds
 
-      // Clear success message after 3 seconds
-      setTimeout(() => setUploadingFile(null), 3000);
+      setDocuments(prev => [...prev, response.data]);
+      startPolling(chatId, response.data.id);
     } catch (err) {
-      console.error("Failed to upload file", err);
+      console.error('Upload failed', err);
       setUploadingFile({ name: file.name, status: 'error' });
-
-      // Clear error message after 5 seconds
-      setTimeout(() => setUploadingFile(null), 5000);
+      setTimeout(() => setUploadingFile(null), 3000); // Hide after 3 seconds
     } finally {
       setUploading(false);
       e.target.value = '';
@@ -116,6 +126,9 @@ function App() {
 
   const createNewChat = async (title = "New Conversation") => {
     try {
+      if (messages.length === 0 && currentChatId) {
+        return;
+      }
       const response = await axios.post(`${API_BASE}/chats`, { title });
       const newChat = response.data;
       setChats(prev => [newChat, ...prev]);
@@ -242,10 +255,14 @@ function App() {
                         onKeyDown={(e) => e.key === 'Enter' && renameChat(chat.id, editingTitle)}
                       />
                     ) : (
-                      <span className="truncate">{chat.title}</span>
+                      <span className="truncate" style={{ maxWidth: "150px" }}>{chat.title}</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover-opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 opacity-0 group-hover-opacity-100 transition-opacity"
+                    style={{
+                      color: "black",
+                      opacity: 1
+                    }}>
                     <button onClick={(e) => archiveChat(e, chat.id)} className="p-1 hover-text-primary">
                       <Archive size={14} />
                     </button>
@@ -257,15 +274,6 @@ function App() {
               </motion.div>
             ))}
           </AnimatePresence>
-        </div>
-
-        <div className="sidebar-footer p-4 border-t border-border">
-          <div className="flex items-center gap-3">
-            <div className="avatar">
-              <User size={20} />
-            </div>
-            <span className="font-medium">Swapnil Singh</span>
-          </div>
         </div>
       </aside>
 
@@ -282,130 +290,157 @@ function App() {
         </header>
 
         <div className="messages-container">
-          {/* Upload Loader */}
-          {uploadingFile && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className={`upload-loader ${uploadingFile.status}`}
-            >
-              <div className="upload-loader-content">
-                {uploadingFile.status === 'uploading' && (
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="upload-spinner"
-                  />
-                )}
-                {uploadingFile.status === 'success' && (
-                  <svg className="upload-icon success" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-                {uploadingFile.status === 'error' && (
-                  <svg className="upload-icon error" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                )}
-                <div className="upload-info">
-                  <span className="upload-filename">{uploadingFile.name}</span>
-                  <span className="upload-status-text">
-                    {uploadingFile.status === 'uploading' && 'Processing document...'}
-                    {uploadingFile.status === 'success' && 'Successfully uploaded!'}
-                    {uploadingFile.status === 'error' && 'Upload failed'}
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {documents.length > 0 && (
-            <div className="documents-tray">
-              {documents.map(doc => (
-                <div key={doc.id} className={`document-chip ${doc.status}`}>
-                  <div className="flex items-center gap-2">
-                    <div className="status-dot"></div>
-                    <span className="text-xs font-medium truncate max-w-[150px]">{doc.file_name}</span>
-                    {doc.status === 'processing' && (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full"
-                      />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {messages.length === 0 ? (
-            <div className="empty-state">
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.5 }}
-              >
-                <h1 className="logo-large">FusionChat</h1>
-                <p className="text-muted-foreground mt-4">How can I help you today?</p>
-              </motion.div>
-            </div>
-          ) : (
-            messages.map((msg, idx) => (
-              <div key={idx} className={`message-row ${msg.role === 'user' ? 'user-message' : 'ai-message'}`}>
-                <div className="avatar">
-                  {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
-                </div>
-                <div className="message-content">
-                  {msg.content}
-                </div>
-              </div>
-            ))
-          )}
-          {loading && (
-            <div className="message-row ai-message">
-              <div className="avatar">
-                <Bot size={20} />
-              </div>
-              <div className="message-content">
+          {/* Message Wrapper - Centered */}
+          <div className="message-wrapper">
+            {messages.length === 0 && documents.length === 0 ? (
+              <div className="empty-state">
                 <motion.div
-                  animate={{ opacity: [0.4, 1, 0.4] }}
-                  transition={{ repeat: Infinity, duration: 1.5 }}
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.5 }}
                 >
-                  Thinking...
+                  <h1 className="logo-large">FusionChat</h1>
+                  <p className="text-muted-foreground mt-4">How can I help you today?</p>
                 </motion.div>
               </div>
-            </div>
-          )}
+            ) : (
+              <>
+                {/* Show documents inline at the start of conversation */}
+                {documents.length > 0 && (
+                  <div className="inline-documents">
+                    {documents.map(doc => (
+                      <div key={doc.id} className={`document-chip-inline ${doc.status}`}>
+                        <div className="document-icon">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div className="document-info">
+                          <span className="document-name">{doc.file_name}</span>
+                          <span className="document-status-text">
+                            {doc.status === 'processing' && 'Processing...'}
+                            {doc.status === 'completed' && 'Ready'}
+                            {doc.status === 'failed' && 'Failed'}
+                          </span>
+                        </div>
+                        {doc.status === 'processing' && (
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="document-spinner"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Messages */}
+                {messages.map((msg, idx) => (
+                  <div key={idx} className={`message-row ${msg.role === 'user' ? 'user-message' : 'ai-message'}`}>
+                    <div className="avatar">
+                      {msg.role === 'user' ? <User size={18} /> : <Bot size={18} />}
+                    </div>
+                    <div className="message-content">
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+            {loading && (
+              <div className="thinking-bubble">
+                <div className="avatar">
+                  <Bot size={18} />
+                </div>
+                <div className="thinking-dots">
+                  <div className="thinking-dot"></div>
+                  <div className="thinking-dot"></div>
+                  <div className="thinking-dot"></div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="input-container">
-          <form className="input-wrapper premium-shadow" onSubmit={handleSendMessage}>
-            <button
-              type="button"
-              className="p-1 hover:bg-accent rounded-full transition-colors text-muted-foreground hover:text-foreground"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Plus size={20} />
-            </button>
-            <input
-              type="file"
-              hidden
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-            />
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything..."
-            />
-            <button className="send-btn" disabled={!input.trim() || loading || uploading} type="submit">
-              <Send size={20} />
-            </button>
-          </form>
-          <div className="text-center mt-3 text-[10px] text-muted-foreground">
-            FusionChat can make mistakes. Check important info.
+        {/* Upload Loader */}
+        {uploadingFile && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className={`upload-loader ${uploadingFile.status}`}
+          >
+            <div className="upload-loader-content">
+              {uploadingFile.status === 'uploading' && (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="upload-spinner"
+                />
+              )}
+              {uploadingFile.status === 'success' && (
+                <svg className="upload-icon success" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {uploadingFile.status === 'error' && (
+                <svg className="upload-icon error" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
+              <div className="upload-info">
+                <span className="upload-filename">{uploadingFile.name}</span>
+                <span className="upload-status-text">
+                  {uploadingFile.status === 'uploading' && 'Processing document...'}
+                  {uploadingFile.status === 'success' && 'Successfully uploaded!'}
+                  {uploadingFile.status === 'error' && 'Upload failed'}
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Input Area - ChatGPT Style */}
+        <div className="input-area">
+          <div className="input-wrapper">
+            <form className="input-container" onSubmit={handleSendMessage}>
+              <textarea
+                className="message-input"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage(e);
+                  }
+                }}
+                placeholder="Message FusionChat..."
+                rows={1}
+              />
+              <input
+                type="file"
+                hidden
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept=".pdf,.txt,.md,.doc,.docx"
+              />
+              <div className="input-actions">
+                <button
+                  type="button"
+                  className="attach-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Attach file"
+                >
+                  <Plus size={20} />
+                </button>
+                <button className="send-btn" disabled={!input.trim() || loading || uploading} type="submit">
+                  <Send size={18} />
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </main>

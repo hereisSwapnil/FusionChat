@@ -18,7 +18,13 @@ class Settings(BaseSettings):
     NEO4J_PASSWORD: str = "password"
 
     # Qdrant Settings
-    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_HOST: str = "localhost"
+    QDRANT_PORT: int = 6333
+
+    @property
+    def QDRANT_URL(self) -> str:
+        return f"http://{self.QDRANT_HOST}:{self.QDRANT_PORT}"
+
     QDRANT_COLLECTION: str = "fusion_chat"
 
     # Ollama Settings
@@ -26,10 +32,16 @@ class Settings(BaseSettings):
     OLLAMA_EMBED_MODEL: str = "nomic-embed-text"
     OLLAMA_GEN_MODEL: str = "llama3.2:1b"
 
-    # Database Settings
-    DATABASE_URL: str = (
-        "postgresql+asyncpg://postgres:password@localhost:5432/fusionchat"
-    )
+    # PostgreSQL Settings
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DB: str = "fusionchat"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "password"
+
+    @property
+    def DATABASE_URL(self) -> str:
+        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
