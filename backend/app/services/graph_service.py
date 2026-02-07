@@ -11,6 +11,7 @@ from app.core.utils import normalize_name
 class GraphService:
     def __init__(self):
         self.client = Neo4jClient()
+        self.llm_service = LLMService()  # Initialize once to avoid import deadlock
 
     def add_entity(self, entity):
         with self.client.driver.session() as session:
@@ -38,8 +39,7 @@ class GraphService:
         return text
 
     def extract_entities_and_relationships(self, text: str) -> ExtractionResult:
-        llm_service = LLMService()
-        response = llm_service.generate(
+        response = self.llm_service.generate(
             EXTRACT_ENTITIES_AND_RELATIONSHIPS_PROMPT + "\n\nText:\n" + text
         )
 
@@ -59,8 +59,7 @@ class GraphService:
             return list(result)
 
     def parse(self, question: str):
-        llm_service = LLMService()
-        raw = llm_service.generate(
+        raw = self.llm_service.generate(
             EXTRACT_ENTITIES_PROMPT + "\n\nQuestion:\n" + question
         )
         data = json.loads(self._extract_json(raw))

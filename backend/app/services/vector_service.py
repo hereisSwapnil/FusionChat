@@ -1,9 +1,13 @@
 from qdrant_client.models import PointStruct, VectorParams, Distance
 from app.db.qdrant import QdrantDBClient
 from app.services.llm_service import LLMService
+import threading
 
 
 class VectorService:
+    _collection_locks = {}  # Class-level lock dictionary
+    _locks_lock = threading.Lock()  # Lock for the locks dictionary
+
     def __init__(self):
         self.client_wrapper = QdrantDBClient()
         self.client = self.client_wrapper.client
@@ -14,14 +18,22 @@ class VectorService:
         return f"chat_{chat_id}"
 
     def _ensure_collection_exists(self, chat_id: str):
-        """Ensure collection exists for the chat."""
+        """Ensure collection exists for the chat (thread-safe)."""
         collection_name = self._get_collection_name(chat_id)
 
-        if not self.client.collection_exists(collection_name):
-            self.client.create_collection(
-                collection_name=collection_name,
-                vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
-            )
+        # Get or create a lock for this specific collection
+        with self._locks_lock:
+            if collection_name not in self._collection_locks:
+                self._collection_locks[collection_name] = threading.Lock()
+            collection_lock = self._collection_locks[collection_name]
+
+        # Use the collection-specific lock to prevent race conditions
+        with collection_lock:
+            if not self.client.collection_exists(collection_name):
+                self.client.create_collection(
+                    collection_name=collection_name,
+                    vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
+                )
 
     def upsert_chunk(self, chunk):
         # Ensure collection exists for this chat

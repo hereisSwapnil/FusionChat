@@ -1,3 +1,5 @@
+@import 'highlight.js/styles/github-dark.css';
+
 :root {
   /* ChatGPT-inspired Color Palette */
   --background: 0 0% 100%;

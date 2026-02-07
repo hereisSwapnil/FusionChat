@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, MessageSquare, Send, User, Bot, Trash2, Archive, Edit2, Menu, MoreVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 import './App.css';
 
 const API_BASE = 'http://localhost:8000'; // Adjust if needed
@@ -342,7 +345,25 @@ function App() {
                       {msg.role === 'user' ? <User size={18} /> : <Bot size={18} />}
                     </div>
                     <div className="message-content">
-                      {msg.content}
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeHighlight]}
+                        components={{
+                          code: ({ node, inline, className, children, ...props }) => {
+                            return inline ? (
+                              <code className={className} {...props}>
+                                {children}
+                              </code>
+                            ) : (
+                              <code className={className} {...props}>
+                                {children}
+                              </code>
+                            );
+                          }
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
                     </div>
                   </div>
                 ))}
