@@ -1,4 +1,7 @@
+
 # FusionChat
+<img src="logo.png" alt="FusionChat Logo" width="400">
+
 
 An AI-powered chat application with advanced RAG (Retrieval-Augmented Generation) capabilities. Upload documents, build knowledge graphs, and have intelligent conversations powered by vector search and graph-based retrieval.
 
